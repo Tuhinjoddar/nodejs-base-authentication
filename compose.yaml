@@ -1,0 +1,62 @@
+version: "3.8"
+services:
+  postgres:
+    image: postgres:latest
+    container_name: database-service
+    restart: always
+    environment:
+      POSTGRES_USER: tuhinjoddar
+      POSTGRES_PASSWORD: proxy123
+      POSTGRES_DB: userInfoDB
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tuhinjoddar -d userInfoDB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - my_network
+  backend: # Service name (can be lowercase)
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    image: backend-image
+    container_name: backend-service
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://tuhinjoddar:proxy123@postgres:5432/userInfoDB?schema=public"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: ["npm", "run", "setup"]
+    networks:
+      - my_network
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    image: frontend-image
+    container_name: frontend-service
+    ports:
+      - "3238:3238"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: always
+    networks:
+      - my_network
+volumes:
+  postgres_data:
+networks:
+  my_network:
+    driver: bridge
